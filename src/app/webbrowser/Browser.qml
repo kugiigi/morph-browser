@@ -553,14 +553,17 @@ Common.BrowserView {
     FocusScope {
         id: recentView
         objectName: "recentView"
-
+        clip: true
         anchors.fill: parent
+//~         anchors.margins: units.gu(4)
         visible: bottomEdgeHandle.dragging || tabslist.animating || (state == "shown")
         onVisibleChanged: {
             if (visible) {
 
                 currentWebview.hideContextMenu();
-                chrome.state = "hidden";
+//~                 if (!browser.wide) {
+                    chrome.state = "hidden";
+//~                 }
             }
             else {
                 chrome.state = "shown";
@@ -580,7 +583,10 @@ Common.BrowserView {
 
         TabsList {
             id: tabslist
-            anchors.fill: parent
+//~             anchors.fill: parent
+            anchors.centerIn: parent
+            height: browser.wide ? browser.height * 0.7 : parent.height
+            width: browser.wide ? browser.width * 0.5 : parent.width
             model: tabsModel
             readonly property real delegateMinHeight: units.gu(20)
             delegateHeight: {
@@ -1031,9 +1037,9 @@ Common.BrowserView {
             right: parent.right
             bottom: parent.bottom
         }
-        enabled: !browser.wide && internal.hasMouse &&
-                 (osk.state == "hidden") && (recentView.state == "")
-        visible: enabled
+        enabled: true //!browser.wide && internal.hasMouse &&
+                 //(osk.state == "hidden") && (recentView.state == "")
+        visible: true //enabled
         height: visible ? units.gu(4) : 0
         // Ensure that this ends up below the chrome, so that the
         // drawer menu’s inverse mouse area covers it.

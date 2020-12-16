@@ -18,13 +18,15 @@
 
 import QtQuick 2.4
 import Ubuntu.Components 1.3
+import QtQuick.Layouts 1.3
 
 Item {
     id: tabslist
 
     property real delegateHeight
     property real chromeHeight
-    property alias model: repeater.model
+//~     property alias model: repeater.model
+    property var model
     readonly property int count: repeater.count
     property bool incognito
 
@@ -58,93 +60,141 @@ Item {
         id: dealayBackground
         interval: 300
     }
-
-    Flickable {
-        id: flickable
-
+    
+    Loader {
+        id: list
+        asynchronous: true
         anchors.fill: parent
+        sourceComponent: browser.wide ? listWideComponent : listNarrowComponent
+    }
+    Component {
+        id: listWideComponent
 
-        flickableDirection: Flickable.VerticalFlick
-        boundsBehavior: Flickable.StopAtBounds
-
-        contentWidth: width
-        contentHeight: model ? (model.count - 1) * delegateHeight + height : 0
-
-        Repeater {
-            id: repeater
+        GridView {
+            visible: browser.wide
+            model: tabslist.model
+            cellWidth: (tabslist.width - units.gu(2)) * 0.5 //units.gu(40)
+            cellHeight: cellWidth * (tabslist.height / tabslist.width) //delegateHeight//units.gu(60)
+            
 
             delegate: Loader {
-                id: delegate
 
                 asynchronous: true
 
-                width: flickable.contentWidth
+                width: (tabslist.width - units.gu(2)) * 0.5 //parent.cellWidth * 0.90 //units.gu(40)
 
-                height: flickable.height
-
-                y: Math.max(flickable.contentY, index * delegateHeight)
-                Behavior on y {
-                    enabled: !flickable.moving && !selectedAnimation.running
-                    UbuntuNumberAnimation {
-                        duration: UbuntuAnimation.BriskDuration
-                    }
-                }
-
-                opacity: selectedAnimation.running && (index > selectedAnimation.index) ? 0 : 1
-                Behavior on opacity {
-                    UbuntuNumberAnimation {
-                        duration: UbuntuAnimation.FastDuration
-                    }
-                }
+                height: width * (tabslist.height / tabslist.width) //parent.cellHeight * 0.90 //units.gu(90)
 
                 readonly property string title: model.title ? model.title : (model.url.toString() ? model.url : i18n.tr("New tab"))
                 readonly property string icon: model.icon
 
-                active: (index >= 0) && ((flickable.contentY + flickable.height + delegateHeight / 2) >= (index * delegateHeight))
-
-                visible: flickable.contentY < ((index + 1) * delegateHeight)
-
                 sourceComponent: TabPreview {
-                    title: delegate.title
-                    icon: delegate.icon
+                    title: model.title
+                    icon: model.icon
                     incognito: tabslist.incognito
                     tab: model.tab
-
-                  /*  Binding {
-                        // Change the height of the location bar controller
-                        // for the first webview only, and only while the tabs
-                        // list view is visible.
-                        when: tabslist.visible && (index == 0)
-                        target: tab && tab.webview ? tab.webview.locationBarController : null
-                        property: "height"
-                        value: invisibleTabChrome.height
-                    } */
 
                     onSelected: tabslist.selectAndAnimateTab(index)
                     onClosed: tabslist.tabClosed(index)
                 }
             }
         }
+    }
 
-        PropertyAnimation {
-            id: selectedAnimation
-            property int index: 0
-            target: flickable
-            property: "contentY"
-            to: index * delegateHeight
-            duration: UbuntuAnimation.FastDuration
-            onStopped: {
-                // Delay switching the tab until after the animation has completed.
-                delayedTabSelection.index = index
-                delayedTabSelection.start()
+    Component {
+        id: listNarrowComponent
+
+        Flickable {
+            id: flickable
+
+            anchors.fill: parent
+
+            flickableDirection: Flickable.VerticalFlick
+            boundsBehavior: Flickable.StopAtBounds
+
+            contentWidth: width
+            contentHeight: model ? (model.count - 1) * delegateHeight + height : 0
+
+            
+
+                Repeater {
+                    id: repeater
+
+                    model: tabslist.model
+                    delegate: Loader {
+                        id: delegate
+
+                        asynchronous: true
+
+                        width: flickable.contentWidth
+
+                        height: flickable.height
+
+                        y: Math.max(flickable.contentY, index * delegateHeight)
+                        Behavior on y {
+                            enabled: !flickable.moving && !selectedAnimation.running
+                            UbuntuNumberAnimation {
+                                duration: UbuntuAnimation.BriskDuration
+                            }
+                        }
+
+                        opacity: selectedAnimation.running && (index > selectedAnimation.index) ? 0 : 1
+                        Behavior on opacity {
+                            UbuntuNumberAnimation {
+                                duration: UbuntuAnimation.FastDuration
+                            }
+                        }
+
+                        readonly property string title: model.title ? model.title : (model.url.toString() ? model.url : i18n.tr("New tab"))
+                        readonly property string icon: model.icon
+
+                        active: (index >= 0) && ((flickable.contentY + flickable.height + delegateHeight / 2) >= (index * delegateHeight))
+
+                        visible: flickable.contentY < ((index + 1) * delegateHeight)
+
+                        sourceComponent: TabPreview {
+                            title: delegate.title
+                            icon: delegate.icon
+                            incognito: tabslist.incognito
+                            tab: model.tab
+
+                          /*  Binding {
+                                // Change the height of the location bar controller
+                                // for the first webview only, and only while the tabs
+                                // list view is visible.
+                                when: tabslist.visible && (index == 0)
+                                target: tab && tab.webview ? tab.webview.locationBarController : null
+                                property: "height"
+                                value: invisibleTabChrome.height
+                            } */
+
+                            onSelected: tabslist.selectAndAnimateTab(index)
+                            onClosed: tabslist.tabClosed(index)
+                        }
+                    }
+                }
+
+
+            PropertyAnimation {
+                id: selectedAnimation
+                property int index: 0
+                target: flickable
+                property: "contentY"
+                to: index * delegateHeight
+                duration: UbuntuAnimation.FastDuration
+                onStopped: {
+                    // Delay switching the tab until after the animation has completed.
+                    delayedTabSelection.index = index
+                    delayedTabSelection.start()
+                }
             }
-        }
 
-        Timer {
-            id: delayedTabSelection
-            interval: 1
-            property int index: 0
-            onTriggered: tabslist.tabSelected(index)
+            Timer {
+                id: delayedTabSelection
+                interval: 1
+                property int index: 0
+                onTriggered: tabslist.tabSelected(index)
+            }
         }
     }
 
