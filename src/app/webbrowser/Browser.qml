@@ -123,6 +123,13 @@ Common.BrowserView {
         // otherwise chrome position can break
         internal.switchToTab(tabsModel.count - 1, true);
     }
+    
+    function openRecentView() {
+        recentView.state = "shown"
+        if (!browser.wide) {
+            recentToolbar.state = "shown"
+        }
+    }
 
     signal newWindowRequested(bool incognito)
     signal newWindowFromTab(var tab, var callback)
@@ -474,6 +481,7 @@ Common.BrowserView {
             // Ref.: https://launchpad.net/bugs/1659435
             //       https://bugreports.qt.io/browse/QTBUG-54657
             function setActive(active) {
+                console.log("setActive " + active)
                 if (active) {
                     if (newTabViewLoader.source == "") {
                         selectTabView();
@@ -553,17 +561,18 @@ Common.BrowserView {
     FocusScope {
         id: recentView
         objectName: "recentView"
-        clip: true
+//~         clip: true
         anchors.fill: parent
-//~         anchors.margins: units.gu(4)
+        z: browser.wide ? 1 : 0
         visible: bottomEdgeHandle.dragging || tabslist.animating || (state == "shown")
         onVisibleChanged: {
             if (visible) {
-
+                forceActiveFocus()
                 currentWebview.hideContextMenu();
-//~                 if (!browser.wide) {
+                tabslist.reset()
+                if (!browser.wide) {
                     chrome.state = "hidden";
-//~                 }
+                }
             }
             else {
                 chrome.state = "shown";
@@ -573,20 +582,66 @@ Common.BrowserView {
         states: State {
             name: "shown"
         }
+        
+        onStateChanged: console.log("state: " + state)
 
         function closeAndSwitchToTab(index) {
             recentView.reset()
             internal.switchToTab(index, false)
+            
         }
 
-        Keys.onEscapePressed: closeAndSwitchToTab(0)
+        Keys.onEscapePressed: {
+            if (browser.wide) {
+                recentView.reset()
+            } else {
+                closeAndSwitchToTab(0)
+            }
+        }
+//~         KeyNavigation.down: tabslist.view
+        Keys.onPressed: {
+            if (event.text.trim() !== "") {
+                tabslist.focusInput();
+                tabslist.searchText = event.text;
+            }
+            switch (event.key) {
+                case Qt.Key_Right:
+                case Qt.Key_Left:
+                case Qt.Key_Down:
+                    tabslist.view.forceActiveFocus()// = true;
+                    break;
+                case Qt.Key_Up:
+                    tabslist.focusInput();
+                    break;
+            }
+            // Catch all presses here in case the navigation lets something through
+            // We never want to end up in the launcher with focus
+            event.accepted = true;
+        }
+        
+        Rectangle {
+            color: UbuntuColors.jet//theme.palette.normal.backgroundText
+            opacity: 0.5
+            anchors.fill: parent
+            
+            MouseArea {
+                anchors.fill: parent
+                preventStealing: true
+                onClicked: recentView.reset()
+            }
+        }
 
         TabsList {
             id: tabslist
 //~             anchors.fill: parent
-            anchors.centerIn: parent
-            height: browser.wide ? browser.height * 0.7 : parent.height
-            width: browser.wide ? browser.width * 0.5 : parent.width
+            anchors {
+                top: parent.top
+                topMargin: browser.wide ? chrome.height : 0
+                bottom: parent.bottom
+                horizontalCenter: parent.horizontalCenter
+            }
+//~             height: browser.wide ? browser.height * 0.7 : parent.height
+            width: browser.wide ? browser.width * 0.7 : parent.width
             model: tabsModel
             readonly property real delegateMinHeight: units.gu(20)
             delegateHeight: {
@@ -616,8 +671,8 @@ Common.BrowserView {
             objectName: "recentToolbar"
 
             anchors {
-                left: parent.left
-                right: parent.right
+                left: tabslist.left //parent.left
+                right: tabslist.right //parent.right
             }
             height: units.gu(7)
             state: "hidden"
@@ -726,6 +781,7 @@ Common.BrowserView {
         onSwitchToTab: internal.switchToTab(index, true)
         onRequestNewTab: internal.openUrlInNewTab("", makeCurrent, true, index)
         onTabClosed: internal.closeTab(index, moving)
+        onOpenRecentView: browser.openRecentView()
 
         onFindInPageModeChanged: {
             if (!chrome.findInPageMode) internal.resetFocus()
@@ -949,8 +1005,9 @@ Common.BrowserView {
     }
 
     onWideChanged: {
+        recentView.reset()
         if (wide) {
-            recentView.reset()
+//~             recentView.reset()
         } else {
             // In narrow mode, the tabslist is a stack: the current tab is always at the top.
             tabsModel.move(tabsModel.currentIndex, 0)
@@ -1037,9 +1094,9 @@ Common.BrowserView {
             right: parent.right
             bottom: parent.bottom
         }
-        enabled: true //!browser.wide && internal.hasMouse &&
-                 //(osk.state == "hidden") && (recentView.state == "")
-        visible: true //enabled
+        enabled: !browser.wide && internal.hasMouse &&
+                 (osk.state == "hidden") && (recentView.state == "")
+        visible: enabled
         height: visible ? units.gu(4) : 0
         // Ensure that this ends up below the chrome, so that the
         // drawer menu’s inverse mouse area covers it.
@@ -1759,6 +1816,13 @@ Common.BrowserView {
         sequence: "Ctrl+0"
         enabled: currentWebview
         onActivated: currentWebview.zoomController.resetSaveFit()
+    }
+
+    // Ctrl+W: Open and serach tab list
+    Shortcut {
+        sequence: "Ctrl+Space"
+        enabled: currentWebview
+        onActivated: browser.openRecentView()
     }
 
     Loader {

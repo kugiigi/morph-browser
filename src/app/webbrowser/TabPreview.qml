@@ -39,6 +39,7 @@ QQC2.SwipeDelegate {
         height: tabPreview.height
         color: "transparent"
     }
+    opacity: 1 - Math.abs(swipe.position)
 
     swipe.onCompleted: closed()
     onClicked: tabPreview.selected()
@@ -56,7 +57,7 @@ QQC2.SwipeDelegate {
                 left: parent.left
                 right: parent.right
             }
-            tabWidth: units.gu(26)
+            tabWidth: units.gu(26) //width * 0.8//units.gu(26)
 
             onSelected: tabPreview.selected()
             onClosed: tabPreview.closed()
@@ -73,7 +74,7 @@ QQC2.SwipeDelegate {
 
 
             visible: !tab.loadingPreview
-            height: parent.height
+            height: parent.height - chrome.height
             clip: true
 
             Rectangle {

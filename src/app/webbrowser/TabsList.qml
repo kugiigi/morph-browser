@@ -19,6 +19,7 @@
 import QtQuick 2.4
 import Ubuntu.Components 1.3
 import QtQuick.Layouts 1.3
+import QtQml.Models 2.2
 
 Item {
     id: tabslist
@@ -26,16 +27,22 @@ Item {
     property real delegateHeight
     property real chromeHeight
 //~     property alias model: repeater.model
-    property var model
-    readonly property int count: repeater.count
+    property alias model: filteredModel.model
+//~     property var model
+//~     readonly property int count: repeater.count
+    property alias searchText: searchField.text
+    property alias view: list.item
+    readonly property int count: model.count
     property bool incognito
+    property bool search: false
 
     signal scheduleTabSwitch(int index)
     signal tabSelected(int index)
     signal tabClosed(int index)
 
     function reset() {
-        flickable.contentY = 0
+        list.item.contentY = 0
+        searchText = ""
     }
 
     readonly property bool animating: selectedAnimation.running
@@ -48,56 +55,329 @@ Item {
     Rectangle {
         id: backrect
         width: parent.width
-        height: dealayBackground.running ? invisibleTabChrome.height : parent.height
+        height: delayBackground.running ? invisibleTabChrome.height : parent.height
         color: theme.palette.normal.base
+        visible: !browser.wide
     }
     onVisibleChanged: {
-        if (visible)
-            dealayBackground.start()
+        if (visible) {
+            delayBackground.start()
+            
+            if (browser.wide) {
+                search = true
+            } else {
+                search = false
+            }
+        } else {
+            if (browser.wide) {
+                list.item.focus = false
+            }
+        }
+            
     }
 
     Timer {
-        id: dealayBackground
+        id: delayBackground
         interval: 300
+    }
+    
+    function focusInput() {
+        search = true
+        searchField.selectAll();
+        searchField.forceActiveFocus()//focus = true;
+    }
+    
+    function selectFirstItem() {
+        var firstItem = visibleGroup.get(0)
+        if (browser.wide) {
+            tabslist.selectAndAnimateTab(firstItem.itemsIndex, firstItem.index)
+        } else {
+            tabslist.tabSelected(firstItem.itemsIndex)
+        }
+    }
+    
+    
+    Loader {
+        id: flickableLoader
+        
+        active: list.item && !browser.wide //&& !tabslist.search
+        asynchronous: true
+        sourceComponent: Connections{
+            target: list.item
+            
+            onVerticalOvershootChanged: {
+                if(target.verticalOvershoot < 0){
+                    if(-target.verticalOvershoot >= units.gu(15)){
+                        tabslist.search = true
+                        tabslist.focusInput()
+                    }
+                }
+            }
+        }
+    }  
+    
+    Rectangle {
+        id: searchRec
+        
+        anchors {
+            top: parent.top
+            left: parent.left
+            right: parent.right
+//~             margins: units.gu(1)
+        }
+        height: units.gu(6)
+        color: browser.wide ? "transparent" : theme.palette.normal.background
+        visible: tabslist.search
+
+        TextField {
+            id: searchField
+            
+            anchors {
+                verticalCenter: parent.verticalCenter
+                left: parent.left
+                right: parent.right
+                margins: units.gu(1)
+            }
+    //~         text: ""
+    //~         height: browser.wide ? units.gu(6) : units.gu(4.3)
+    //~         font.pixelSize: browser.wide ? units.gu(4) : units.gu(2)
+            placeholderText: i18n.tr("Search Tabs")
+            primaryItem: Icon {
+                height: parent.height * 0.5
+                width: height
+                name: "search"
+            }
+            
+            onTextChanged: searchDelay.restart()
+            KeyNavigation.down: list.item
+            onAccepted: tabslist.selectFirstItem()
+            
+            Timer {
+                id: searchDelay
+                interval: 300
+                onTriggered: filteredModel.update(searchField.text)
+            }
+        }
     }
     
     Loader {
         id: list
         asynchronous: true
         anchors.fill: parent
+        anchors.topMargin: tabslist.search ? searchRec.height : 0
+        
+        Behavior on anchors.topMargin {
+        UbuntuNumberAnimation {
+            duration: UbuntuAnimation.FastDuration
+        }
+    }
+        
+//~         anchors {
+//~             top: searchRec.bottom
+//~             topMargin: units.gu(1)
+//~             left: parent.left
+//~             right: parent.right
+//~             bottom: parent.bottom
+//~         }
         sourceComponent: browser.wide ? listWideComponent : listNarrowComponent
     }
-    Component {
-        id: listWideComponent
-
-        GridView {
-            visible: browser.wide
-            model: tabslist.model
-            cellWidth: (tabslist.width - units.gu(2)) * 0.5 //units.gu(40)
-            cellHeight: cellWidth * (tabslist.height / tabslist.width) //delegateHeight//units.gu(60)
+    
+    Label {
+        id: resultsLabel
+        
+        text: searchDelay.running ? i18n.tr("Loading...") : i18n.tr("No results")
+        textSize: Label.Large
+        font.weight: Font.DemiBold
+        color: browser.wide ? UbuntuColors.porcelain : theme.palette.normal.baseText
+        anchors {
+            top: searchRec.bottom
+            horizontalCenter: parent.horizontalCenter
+            margins: units.gu(3)
+        }
+        visible: filteredModel.count == 0
+    }
+    
+    DelegateModel {
+        id: filteredModel
+        
+        function update(searchText) {
+            console.log("update " + searchText)
+            if (items.count > 0) {
+                items.setGroups(0, items.count, ["items"]);
+            }
             
+            if (searchText) {
+                filterOnGroup = "visible"
+                var visible = [];
+                var searchTextUpper = searchText.toUpperCase()
+                var titleUpper
+                var urlUpper
+                
+                for (var i = 0; i < items.count; ++i) {
+                    var item = items.get(i);
+                    titleUpper = item.model.title.toUpperCase()
+                    urlUpper = item.model.url.toString().toUpperCase()
+                    if (titleUpper.indexOf(searchTextUpper) > -1 || urlUpper.indexOf(searchTextUpper) > -1 ) {
+                        visible.push(item);
+                    }
+                }
 
-            delegate: Loader {
+                for (i = 0; i < visible.length; ++i) {
+                    item = visible[i];
+                    item.inVisible = true;
+                }
+                console.log("update " + visible.length)
+            } else {
+                filterOnGroup = "items"
+            }
+        }
+        
+//~         model: tabslist.model
+//~         items.onChanged: update(searchField.text)
 
+        groups: [
+            DelegateModelGroup {
+                id: visibleGroup
+                name: "visible"
+                includeByDefault: false
+            }
+        ]
+    
+//~         filterOnGroup: searchText !== "" ? "visible" : "items"
+        delegate: Package {
+            id: packageDelegate
+            
+            Item {
+                id: gridDelegate
+                
+                Package.name: "grid"
+                
+                property int tabIndex: index
+                
+                width: tabslist.view.cellWidth
+                height: tabslist.view.cellHeight
+//~                 anchors.fill: parent
+                clip: true
+
+                TabPreview {
+                    
+                    title: model.title ? model.title : (model.url.toString() ? model.url : i18n.tr("New tab"))
+                    icon: model.icon
+                    incognito: tabslist.incognito
+                    tab: model.tab
+                    
+                    anchors.fill: parent
+                    anchors.margins: units.gu(1)
+
+                    onSelected: tabslist.tabSelected(index)
+                    onClosed: tabslist.tabClosed(index)
+                }
+            }
+            
+            Loader {
+                id: listDelegate
+
+                property int groupIndex: filteredModel.filterOnGroup === "visible" ? packageDelegate.DelegateModel.visibleIndex : index
+                
+                Package.name: "list"
                 asynchronous: true
 
-                width: (tabslist.width - units.gu(2)) * 0.5 //parent.cellWidth * 0.90 //units.gu(40)
+                width: list.item.contentWidth
 
-                height: width * (tabslist.height / tabslist.width) //parent.cellHeight * 0.90 //units.gu(90)
+                height: list.item.height
+
+                y: Math.max(list.item.contentY, groupIndex * delegateHeight)
+                Behavior on y {
+                    enabled: !list.item.moving && !selectedAnimation.running
+                    UbuntuNumberAnimation {
+                        duration: UbuntuAnimation.BriskDuration
+                    }
+                }
+
+                opacity: selectedAnimation.running && (groupIndex > selectedAnimation.listIndex) ? 0 : 1
+                Behavior on opacity {
+                    UbuntuNumberAnimation {
+                        duration: UbuntuAnimation.FastDuration
+                    }
+                }
 
                 readonly property string title: model.title ? model.title : (model.url.toString() ? model.url : i18n.tr("New tab"))
                 readonly property string icon: model.icon
 
+                active: (groupIndex >= 0) && ((list.item.contentY + list.item.height + delegateHeight / 2) >= (groupIndex * delegateHeight))
+
+                visible: list.item.contentY < ((groupIndex + 1) * delegateHeight)
+
                 sourceComponent: TabPreview {
-                    title: model.title
-                    icon: model.icon
+                    title: index + " - " + packageDelegate.DelegateModel.visibleIndex + " - " + listDelegate.title
+                    icon: listDelegate.icon
                     incognito: tabslist.incognito
                     tab: model.tab
 
-                    onSelected: tabslist.selectAndAnimateTab(index)
+                  /*  Binding {
+                        // Change the height of the location bar controller
+                        // for the first webview only, and only while the tabs
+                        // list view is visible.
+                        when: tabslist.visible && (index == 0)
+                        target: tab && tab.webview ? tab.webview.locationBarController : null
+                        property: "height"
+                        value: invisibleTabChrome.height
+                    } */
+
+                    onSelected: tabslist.selectAndAnimateTab(index, groupIndex)
+//~                     onSelected: console.log(packageDelegate.DelegateModel.groups + " - " + index + " - " + groupIndex)
                     onClosed: tabslist.tabClosed(index)
+                    
+//~                     Rectangle {
+//~                         visible: listDelegate.activeFocus
+//~                         anchors.fill: parent
+//~                         color: theme.palette.normal.focus
+//~                         opacity: 0.4
+//~                     }
                 }
             }
+        }
+    }
+    
+    Component {
+        id: listWideComponent
+        
+        GridView {
+            id: gridView
+            
+            property int columnCount: switch (true) {
+                case tabslist.width >= units.gu(100):
+                    3
+                    break;
+                case tabslist.width >= units.gu(60):
+                    2
+                    break;
+                default:
+                    1
+                    break;
+            }
+            
+            clip: true
+            model: filteredModel.parts.grid
+            cellWidth: (tabslist.width) / columnCount//units.gu(40)
+            cellHeight: cellWidth * (tabslist.height / tabslist.width) //delegateHeight//units.gu(60)
+            highlight: Component {
+                Item {
+                    z: 10
+                    width: gridView.cellWidth
+                    height: gridView.cellHeight
+                    opacity: 0.4
+                    visible: gridView.activeFocus
+                    
+                    Rectangle {
+                        anchors.fill: parent
+                        color: theme.palette.normal.focus
+                    }
+                }
+            }
+            
+            Keys.onEnterPressed: tabslist.tabSelected(currentItem.tabIndex)
+            Keys.onReturnPressed: tabslist.tabSelected(currentItem.tabIndex)
         }
     }
 
@@ -110,101 +390,60 @@ Item {
             anchors.fill: parent
 
             flickableDirection: Flickable.VerticalFlick
-            boundsBehavior: Flickable.StopAtBounds
+//~             boundsBehavior: Flickable.StopAtBounds
 
             contentWidth: width
-            contentHeight: model ? (model.count - 1) * delegateHeight + height : 0
-
+            contentHeight: filteredModel ? (filteredModel.count - 1) * delegateHeight + height : 0
             
-
-                Repeater {
-                    id: repeater
-
-                    model: tabslist.model
-                    delegate: Loader {
-                        id: delegate
-
-                        asynchronous: true
-
-                        width: flickable.contentWidth
-
-                        height: flickable.height
-
-                        y: Math.max(flickable.contentY, index * delegateHeight)
-                        Behavior on y {
-                            enabled: !flickable.moving && !selectedAnimation.running
-                            UbuntuNumberAnimation {
-                                duration: UbuntuAnimation.BriskDuration
-                            }
-                        }
-
-                        opacity: selectedAnimation.running && (index > selectedAnimation.index) ? 0 : 1
-                        Behavior on opacity {
-                            UbuntuNumberAnimation {
-                                duration: UbuntuAnimation.FastDuration
-                            }
-                        }
-
-                        readonly property string title: model.title ? model.title : (model.url.toString() ? model.url : i18n.tr("New tab"))
-                        readonly property string icon: model.icon
-
-                        active: (index >= 0) && ((flickable.contentY + flickable.height + delegateHeight / 2) >= (index * delegateHeight))
-
-                        visible: flickable.contentY < ((index + 1) * delegateHeight)
-
-                        sourceComponent: TabPreview {
-                            title: delegate.title
-                            icon: delegate.icon
-                            incognito: tabslist.incognito
-                            tab: model.tab
-
-                          /*  Binding {
-                                // Change the height of the location bar controller
-                                // for the first webview only, and only while the tabs
-                                // list view is visible.
-                                when: tabslist.visible && (index == 0)
-                                target: tab && tab.webview ? tab.webview.locationBarController : null
-                                property: "height"
-                                value: invisibleTabChrome.height
-                            } */
-
-                            onSelected: tabslist.selectAndAnimateTab(index)
-                            onClosed: tabslist.tabClosed(index)
-                        }
-                    }
-                }
-
-
-            PropertyAnimation {
-                id: selectedAnimation
-                property int index: 0
-                target: flickable
-                property: "contentY"
-                to: index * delegateHeight
-                duration: UbuntuAnimation.FastDuration
-                onStopped: {
-                    // Delay switching the tab until after the animation has completed.
-                    delayedTabSelection.index = index
-                    delayedTabSelection.start()
+            onVisibleChanged: {
+                // WORKAROUND: Repeater items stay hidden when switching from wide to narrow layout
+                // only if the model is direcly assigned. This solves that issue.
+                if (visible) {
+                    repeater.model = filteredModel.parts.list
+                } else {
+                    repeater.model = null
                 }
             }
+            
+            Repeater {
+                id: repeater
 
-            Timer {
-                id: delayedTabSelection
-                interval: 1
-                property int index: 0
-                onTriggered: tabslist.tabSelected(index)
+//~                 model: browser.wide ? null : filteredModel.parts.list
+                
             }
         }
     }
+    
+    Timer {
+        id: delayedTabSelection
+        interval: 1
+        property int index: 0
+        onTriggered: tabslist.tabSelected(index)
+    }
+    
+    PropertyAnimation {
+        id: selectedAnimation
+        property int tabIndex: 0
+        property int listIndex: 0
+        target: list.item
+        property: "contentY"
+        to: listIndex * delegateHeight
+        duration: UbuntuAnimation.FastDuration
+        onStopped: {
+            // Delay switching the tab until after the animation has completed.
+            delayedTabSelection.index = tabIndex
+            delayedTabSelection.start()
+        }
+    }
 
-    function selectAndAnimateTab(index) {
+    function selectAndAnimateTab(tabIndex, listIndex) {
         // Animate tab into full view
-        if (index == 0) {
+        if (tabIndex == 0) {
             tabSelected(0)
         } else {
-            selectedAnimation.index = index
-            scheduleTabSwitch(index)
+            selectedAnimation.tabIndex = tabIndex
+            selectedAnimation.listIndex = listIndex ? listIndex : tabIndex
+            scheduleTabSwitch(tabIndex)
             selectedAnimation.start()
         }
     }

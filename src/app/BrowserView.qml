@@ -49,6 +49,7 @@ FocusScope {
     
     default property alias contents: contentsItem.data
     property alias automaticOrientation: contentsItem.automaticOrientation
+    property bool automaticOrientation: false
     OrientationHelper {
         id: contentsItem
 
