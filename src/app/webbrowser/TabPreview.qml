@@ -76,7 +76,7 @@ QQC2.SwipeDelegate {
 
 
             visible: !tab.loadingPreview
-            height: parent.height
+            height: parent.height - chrome.height
             clip: true
 
             Rectangle {
