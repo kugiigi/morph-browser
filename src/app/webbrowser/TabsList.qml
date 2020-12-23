@@ -26,10 +26,7 @@ Item {
 
     property real delegateHeight
     property real chromeHeight
-//~     property alias model: repeater.model
     property alias model: filteredModel.model
-//~     property var model
-//~     readonly property int count: repeater.count
     property alias searchText: searchField.text
     property alias view: list.item
     readonly property int count: model.count
@@ -84,7 +81,7 @@ Item {
     function focusInput() {
         search = true
         searchField.selectAll();
-        searchField.forceActiveFocus()//focus = true;
+        searchField.forceActiveFocus()
     }
     
     function selectFirstItem() {
@@ -100,14 +97,16 @@ Item {
     Loader {
         id: flickableLoader
         
-        active: list.item && !browser.wide //&& !tabslist.search
+        readonly property real expansionThreshold: units.gu(15)
+        
+        active: list.item && !browser.wide
         asynchronous: true
         sourceComponent: Connections{
             target: list.item
             
             onVerticalOvershootChanged: {
                 if(target.verticalOvershoot < 0){
-                    if(-target.verticalOvershoot >= units.gu(15)){
+                    if(-target.verticalOvershoot >= expansionThreshold){
                         tabslist.search = true
                         tabslist.focusInput()
                     }
@@ -123,12 +122,18 @@ Item {
             top: parent.top
             left: parent.left
             right: parent.right
-//~             margins: units.gu(1)
         }
         height: units.gu(6)
         color: browser.wide ? "transparent" : theme.palette.normal.background
-        visible: tabslist.search
+        opacity: tabslist.search ? 1 : list.item.verticalOvershoot < 0 ? -list.item.verticalOvershoot / height : 0
 
+
+        Behavior on opacity {
+            UbuntuNumberAnimation {
+                duration: UbuntuAnimation.FastDuration
+            }
+        }
+        
         TextField {
             id: searchField
             
@@ -138,9 +143,7 @@ Item {
                 right: parent.right
                 margins: units.gu(1)
             }
-    //~         text: ""
-    //~         height: browser.wide ? units.gu(6) : units.gu(4.3)
-    //~         font.pixelSize: browser.wide ? units.gu(4) : units.gu(2)
+
             placeholderText: i18n.tr("Search Tabs")
             primaryItem: Icon {
                 height: parent.height * 0.5
@@ -167,18 +170,10 @@ Item {
         anchors.topMargin: tabslist.search ? searchRec.height : 0
         
         Behavior on anchors.topMargin {
-        UbuntuNumberAnimation {
-            duration: UbuntuAnimation.FastDuration
+            UbuntuNumberAnimation {
+                duration: UbuntuAnimation.FastDuration
+            }
         }
-    }
-        
-//~         anchors {
-//~             top: searchRec.bottom
-//~             topMargin: units.gu(1)
-//~             left: parent.left
-//~             right: parent.right
-//~             bottom: parent.bottom
-//~         }
         sourceComponent: browser.wide ? listWideComponent : listNarrowComponent
     }
     
@@ -201,7 +196,6 @@ Item {
         id: filteredModel
         
         function update(searchText) {
-            console.log("update " + searchText)
             if (items.count > 0) {
                 items.setGroups(0, items.count, ["items"]);
             }
@@ -226,14 +220,10 @@ Item {
                     item = visible[i];
                     item.inVisible = true;
                 }
-                console.log("update " + visible.length)
             } else {
                 filterOnGroup = "items"
             }
         }
-        
-//~         model: tabslist.model
-//~         items.onChanged: update(searchField.text)
 
         groups: [
             DelegateModelGroup {
@@ -242,8 +232,7 @@ Item {
                 includeByDefault: false
             }
         ]
-    
-//~         filterOnGroup: searchText !== "" ? "visible" : "items"
+
         delegate: Package {
             id: packageDelegate
             
@@ -256,7 +245,6 @@ Item {
                 
                 width: tabslist.view.cellWidth
                 height: tabslist.view.cellHeight
-//~                 anchors.fill: parent
                 clip: true
 
                 TabPreview {
@@ -309,7 +297,7 @@ Item {
                 visible: list.item.contentY < ((groupIndex + 1) * delegateHeight)
 
                 sourceComponent: TabPreview {
-                    title: index + " - " + packageDelegate.DelegateModel.visibleIndex + " - " + listDelegate.title
+                    title: listDelegate.title
                     icon: listDelegate.icon
                     incognito: tabslist.incognito
                     tab: model.tab
@@ -325,15 +313,7 @@ Item {
                     } */
 
                     onSelected: tabslist.selectAndAnimateTab(index, groupIndex)
-//~                     onSelected: console.log(packageDelegate.DelegateModel.groups + " - " + index + " - " + groupIndex)
                     onClosed: tabslist.tabClosed(index)
-                    
-//~                     Rectangle {
-//~                         visible: listDelegate.activeFocus
-//~                         anchors.fill: parent
-//~                         color: theme.palette.normal.focus
-//~                         opacity: 0.4
-//~                     }
                 }
             }
         }
@@ -359,8 +339,8 @@ Item {
             
             clip: true
             model: filteredModel.parts.grid
-            cellWidth: (tabslist.width) / columnCount//units.gu(40)
-            cellHeight: cellWidth * (tabslist.height / tabslist.width) //delegateHeight//units.gu(60)
+            cellWidth: (tabslist.width) / columnCount
+            cellHeight: cellWidth * (tabslist.height / tabslist.width)
             highlight: Component {
                 Item {
                     z: 10
@@ -390,7 +370,7 @@ Item {
             anchors.fill: parent
 
             flickableDirection: Flickable.VerticalFlick
-//~             boundsBehavior: Flickable.StopAtBounds
+            boundsBehavior: Flickable.DragOverBounds //StopAtBounds
 
             contentWidth: width
             contentHeight: filteredModel ? (filteredModel.count - 1) * delegateHeight + height : 0
@@ -400,16 +380,11 @@ Item {
                 // only if the model is direcly assigned. This solves that issue.
                 if (visible) {
                     repeater.model = filteredModel.parts.list
-                } else {
-                    repeater.model = null
                 }
             }
             
             Repeater {
                 id: repeater
-
-//~                 model: browser.wide ? null : filteredModel.parts.list
-                
             }
         }
     }

@@ -481,7 +481,6 @@ Common.BrowserView {
             // Ref.: https://launchpad.net/bugs/1659435
             //       https://bugreports.qt.io/browse/QTBUG-54657
             function setActive(active) {
-                console.log("setActive " + active)
                 if (active) {
                     if (newTabViewLoader.source == "") {
                         selectTabView();
@@ -561,7 +560,7 @@ Common.BrowserView {
     FocusScope {
         id: recentView
         objectName: "recentView"
-//~         clip: true
+
         anchors.fill: parent
         z: browser.wide ? 1 : 0
         visible: bottomEdgeHandle.dragging || tabslist.animating || (state == "shown")
@@ -582,8 +581,6 @@ Common.BrowserView {
         states: State {
             name: "shown"
         }
-        
-        onStateChanged: console.log("state: " + state)
 
         function closeAndSwitchToTab(index) {
             recentView.reset()
@@ -598,7 +595,7 @@ Common.BrowserView {
                 closeAndSwitchToTab(0)
             }
         }
-//~         KeyNavigation.down: tabslist.view
+
         Keys.onPressed: {
             if (event.text.trim() !== "") {
                 tabslist.focusInput();
@@ -608,7 +605,7 @@ Common.BrowserView {
                 case Qt.Key_Right:
                 case Qt.Key_Left:
                 case Qt.Key_Down:
-                    tabslist.view.forceActiveFocus()// = true;
+                    tabslist.view.forceActiveFocus()
                     break;
                 case Qt.Key_Up:
                     tabslist.focusInput();
@@ -620,7 +617,7 @@ Common.BrowserView {
         }
         
         Rectangle {
-            color: UbuntuColors.jet//theme.palette.normal.backgroundText
+            color: UbuntuColors.jet
             opacity: 0.5
             anchors.fill: parent
             
@@ -633,14 +630,14 @@ Common.BrowserView {
 
         TabsList {
             id: tabslist
-//~             anchors.fill: parent
+
             anchors {
                 top: parent.top
                 topMargin: browser.wide ? chrome.height : 0
                 bottom: parent.bottom
                 horizontalCenter: parent.horizontalCenter
             }
-//~             height: browser.wide ? browser.height * 0.7 : parent.height
+
             width: browser.wide ? browser.width * 0.7 : parent.width
             model: tabsModel
             readonly property real delegateMinHeight: units.gu(20)
@@ -671,8 +668,8 @@ Common.BrowserView {
             objectName: "recentToolbar"
 
             anchors {
-                left: tabslist.left //parent.left
-                right: tabslist.right //parent.right
+                left: tabslist.left
+                right: tabslist.right
             }
             height: units.gu(7)
             state: "hidden"
@@ -1006,9 +1003,7 @@ Common.BrowserView {
 
     onWideChanged: {
         recentView.reset()
-        if (wide) {
-//~             recentView.reset()
-        } else {
+        if (!wide) {
             // In narrow mode, the tabslist is a stack: the current tab is always at the top.
             tabsModel.move(tabsModel.currentIndex, 0)
         }

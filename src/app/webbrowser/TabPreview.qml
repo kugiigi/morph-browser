@@ -39,7 +39,6 @@ QQC2.SwipeDelegate {
         height: tabPreview.height
         color: "transparent"
     }
-    opacity: 1 - Math.abs(swipe.position)
 
     swipe.onCompleted: closed()
     onClicked: tabPreview.selected()
