@@ -140,6 +140,10 @@ Common.BrowserView {
     signal shareLinkRequested(url linkUrl, string title)
     signal shareTextRequested(string text)
 
+    onOpenLinkInNewTabRequested: {
+        internal.openUrlInNewTab(url, !background, true, tabsModel.selectedIndex + 1)
+    }
+
     onShareLinkRequested: {
 
         internal.shareLink(linkUrl, title);
