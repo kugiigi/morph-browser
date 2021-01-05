@@ -57,6 +57,19 @@ FocusScope {
         addressbar.selectAll()
     }
 
+    function showNavHistory(model, caller) {
+        if (caller === undefined) caller = root
+        var properties = {"model": model
+                ,"incognito": incognito
+                ,"availableHeight": availableHeight
+                ,"availableWidth": width
+            }
+
+        var navHistory = PopupUtils.open(Qt.resolvedUrl("../NavHistoryDialog.qml"),
+                                                       caller, properties)
+        return navHistory
+    }
+
     FocusScope {
         anchors {
             fill: parent
@@ -76,6 +89,8 @@ FocusScope {
             height: root.height
             width: height * 0.8
 
+            enableContextMenu: true
+
             anchors {
                 left: parent.left
                 verticalCenter: parent.verticalCenter
@@ -85,15 +100,23 @@ FocusScope {
             onTriggered: {
                 if (findInPageMode) {
                     findInPageMode = false
-                }
-                else {
-                    if (internal.webview.loading)
-                    {
+                } else {
+                    if (internal.webview.loading) {
                         internal.webview.stop()
                     }
                     internal.webview.goBack()
-                    }
                 }
+            }
+
+            onShowContextMenu: contextMenu = showNavHistory(internal.webview.navigationHistory.backItems, backButton)
+            
+            Connections {
+                target: backButton.contextMenu
+                onNavigate: {
+                    internal.webview.goBackOrForward(offset)
+                    PopupUtils.close(target)
+                }
+            }
         }
 
         Connections {
@@ -121,6 +144,8 @@ FocusScope {
             visible: enabled
             width: visible ? height * 0.8 : 0
 
+            enableContextMenu: true
+
             anchors {
                 left: backButton.right
                 verticalCenter: parent.verticalCenter
@@ -134,6 +159,16 @@ FocusScope {
                     internal.webview.stop()
                 }
                 internal.webview.goForward()
+            }
+
+            onShowContextMenu: contextMenu = showNavHistory(internal.webview.navigationHistory.forwardItems, forwardButton)
+
+            Connections {
+                target: forwardButton.contextMenu
+                onNavigate: {
+                    internal.webview.goBackOrForward(offset)
+                    PopupUtils.close(target)
+                }
             }
         }
 
