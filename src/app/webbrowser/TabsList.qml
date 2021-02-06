@@ -29,7 +29,8 @@ Item {
     property alias model: filteredModel.model
     readonly property int count: model.count
     property alias searchText: searchField.text
-    property alias view: list.item
+//~     property alias view: list.item
+    property var view: browser.wide ? gridLoader.item : listLoader.item
     property bool incognito
     property bool searchMode: false
 
@@ -43,6 +44,25 @@ Item {
     }
 
     readonly property bool animating: selectedAnimation.running
+
+    Component.onCompleted: {
+        if (browser.wide) {
+            gridLoader.active = true
+        } else {
+            listLoader.active = true
+        }
+    }
+
+    Connections {
+        target: browser
+        onWideChanged: {
+            if (browser.wide) {
+                gridLoader.active = true
+            } else {
+                listLoader.active = true
+            }
+        }
+    }
 
     TabChrome {
         id: invisibleTabChrome
@@ -142,6 +162,7 @@ Item {
             }
 
             placeholderText: i18n.tr("Search Tabs")
+            inputMethodHints: Qt.ImhNoPredictiveText
             primaryItem: Icon {
                 height: parent.height * 0.5
                 width: height
@@ -174,21 +195,65 @@ Item {
         }
         visible: filteredModel.count == 0
     }
-
+    
+    
     Loader {
-        id: list
+        id: listLoader
 
+//~         active: !browser.wide
+        active: false
+        visible: !browser.wide
         asynchronous: true
         anchors.fill: parent
         anchors.topMargin: tabslist.searchMode ? searchRec.height : 0
-        sourceComponent: browser.wide ? listWideComponent : listNarrowComponent
-
+        sourceComponent: listNarrowComponent
+        
         Behavior on anchors.topMargin {
             UbuntuNumberAnimation {
                 duration: UbuntuAnimation.SnapDuration
             }
         }
     }
+
+    Loader {
+        id: gridLoader
+
+//~         active: browser.wide
+        active: false
+        visible: browser.wide
+        asynchronous: true
+        anchors.fill: parent
+        anchors.topMargin: tabslist.searchMode ? searchRec.height : 0
+        sourceComponent: listWideComponent
+        
+        Behavior on anchors.topMargin {
+            UbuntuNumberAnimation {
+                duration: UbuntuAnimation.SnapDuration
+            }
+        }
+    }
+//~     Loader {
+//~         id: list
+
+//~         asynchronous: true
+//~         anchors.fill: parent
+//~         anchors.topMargin: tabslist.searchMode ? searchRec.height : 0
+//~         sourceComponent: browser.wide ? listWideComponent : listNarrowComponent
+
+//~         Connections {
+//~             target: browser
+//~             onWideChanged: {
+//~                 repeater.model = null
+//~                 repeater.model = filteredModel.parts.list
+//~             }
+//~         }
+
+//~         Behavior on anchors.topMargin {
+//~             UbuntuNumberAnimation {
+//~                 duration: UbuntuAnimation.SnapDuration
+//~             }
+//~         }
+//~     }
 
     DelegateModel {
         id: filteredModel
@@ -253,7 +318,7 @@ Item {
                     property real verticalMargin: horizontalMargin * ((gridDelegate.height - tabslist.tabChromeHeight) / gridDelegate.width)
 
                     title: model.title ? model.title : (model.url.toString() ? model.url : i18n.tr("New tab"))
-                    icon: model.icon
+//~                     tabIcon: model.icon
                     incognito: tabslist.incognito
                     tab: model.tab
                     chromeHeight: tabslist.tabChromeHeight
@@ -302,7 +367,7 @@ Item {
 
                 sourceComponent: TabPreview {
                     title: listDelegate.title
-                    tabIcon: listDelegate.icon
+//~                     tabIcon: listDelegate.icon
                     incognito: tabslist.incognito
                     tab: model.tab
                     chromeHeight: tabslist.tabChromeHeight
@@ -371,6 +436,8 @@ Item {
 
         Flickable {
             id: flickable
+            
+            property alias model: repeater.model
 
             anchors.fill: parent
 
@@ -383,12 +450,16 @@ Item {
                 // WORKAROUND: Repeater items stay hidden when switching from wide to narrow layout
                 // only if the model is direcly assigned. This solves that issue.
                 if (visible) {
-                    repeater.model = filteredModel.parts.list
+//~                     repeater.model = null
+//~                     repeater.visible = false
+//~                     repeater.model = filteredModel.parts.list
+//~                     console.log("visiblururur!!!!!!!!! - " + repeater.model.count)
                 }
             }
 
             Repeater {
                 id: repeater
+                model: filteredModel.parts.list
             }
         }
     }
