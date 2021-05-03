@@ -126,6 +126,13 @@ Common.BrowserView {
         internal.switchToTab(tabsModel.count - 1, true);
     }
 
+    function openRecentView() {
+        recentView.state = "shown"
+        if (!browser.wide) {
+            recentToolbar.state = "shown"
+        }
+    }
+
     signal newWindowRequested(bool incognito)
     signal newWindowFromTab(var tab, var callback)
     signal openLinkInNewWindowRequested(url url, bool incognito)
@@ -572,12 +579,18 @@ Common.BrowserView {
         id: recentView
         objectName: "recentView"
 
+        z: browser.wide ? 1 : 0
         anchors.fill: parent
         visible: bottomEdgeHandle.dragging || tabslist.animating || (state == "shown")
         onVisibleChanged: {
             if (visible) {
-
+                forceActiveFocus()
                 currentWebview.hideContextMenu();
+                tabslist.reset()
+
+                if (!browser.wide) {
+                    chrome.state = "hidden";
+                }
             }
             else {
                 chrome.state = "shown";
@@ -599,11 +612,60 @@ Common.BrowserView {
             internal.switchToTab(index, false)
         }
 
-        Keys.onEscapePressed: closeAndSwitchToTab(0)
+        Keys.onEscapePressed: {
+            if (browser.wide) {
+                recentView.reset()
+            } else {
+                closeAndSwitchToTab(0)
+            }
+        }
+
+        Keys.onPressed: {
+            if (event.text.trim() !== "") {
+                tabslist.focusInput();
+                tabslist.searchText = event.text;
+            }
+            switch (event.key) {
+                case Qt.Key_Right:
+                case Qt.Key_Left:
+                case Qt.Key_Down:
+                    tabslist.view.forceActiveFocus()
+                    break;
+                case Qt.Key_Up:
+                    tabslist.focusInput();
+                    break;
+            }
+
+            event.accepted = true;
+        }
+
+        Rectangle {
+            id: backgroundRec
+
+            anchors.fill: parent
+            color: UbuntuColors.jet
+            opacity: 0.5
+            visible: browser.wide
+
+            MouseArea {
+                anchors.fill: parent
+                preventStealing: true
+                onClicked: recentView.reset()
+            }
+        }
 
         TabsList {
             id: tabslist
-            anchors.fill: parent
+
+            anchors {
+                top: parent.top
+                topMargin: !browser.wide ? 0 :
+                    browser.height > units.gu(90) ? chrome.height : units.gu(2)
+                bottom: parent.bottom
+                horizontalCenter: parent.horizontalCenter
+            }
+
+            width: browser.wide ? browser.width * 0.7 : parent.width
             model: tabsModel
             readonly property real delegateMinHeight: units.gu(20)
             delegateHeight: {
@@ -637,8 +699,8 @@ Common.BrowserView {
             objectName: "recentToolbar"
 
             anchors {
-                left: parent.left
-                right: parent.right
+                left: tabslist.left
+                right: tabslist.right
             }
             height: units.gu(7)
             state: "hidden"
@@ -780,6 +842,7 @@ Common.BrowserView {
         onSwitchToTab: internal.switchToTab(index, true)
         onRequestNewTab: internal.openUrlInNewTab("", makeCurrent, true, index)
         onTabClosed: internal.closeTab(index, moving)
+        onOpenRecentView: browser.openRecentView()
 
         onFindInPageModeChanged: {
             if (!chrome.findInPageMode) internal.resetFocus()
@@ -1003,9 +1066,8 @@ Common.BrowserView {
     }
 
     onWideChanged: {
-        if (wide) {
-            recentView.reset()
-        } else {
+        recentView.reset()
+        if (!wide) {
             // In narrow mode, the tabslist is a stack: the current tab is always at the top.
             tabsModel.move(tabsModel.currentIndex, 0)
         }
@@ -1292,10 +1354,6 @@ Common.BrowserView {
         Connections {
             target: downloadsViewLoader.item
             onDone: downloadsViewLoader.active = false
-            onPreview: {
-                    downloadsViewLoader.active = false
-                    currentWebview.url = url;
-            }
         }
 
         onStatusChanged: {
@@ -1359,7 +1417,7 @@ Common.BrowserView {
                 tab.load()
             }
             if (!url.toString()) {
-                maybeFocusAddressBar()
+                focusAddressBar()
             }
         }
 
@@ -1481,7 +1539,7 @@ Common.BrowserView {
                     recentView.focus = true
                 } else if (tab) {
                     if (tab.empty) {
-                        maybeFocusAddressBar()
+                        focusAddressBar()
                     } else {
                         tabContainer.forceActiveFocus()
                         tab.load();
@@ -1500,18 +1558,10 @@ Common.BrowserView {
             var currentTab = tabsModel.currentTab;
             if (currentTab) {
                 if (currentTab.empty) {
-                    internal.maybeFocusAddressBar()
+                    internal.focusAddressBar()
                 } else {
                     contentsContainer.focus = true;
                 }
-            }
-        }
-
-        function maybeFocusAddressBar() {
-            if (keyboardModel.count > 0) {
-                focusAddressBar()
-            } else {
-                contentsContainer.forceActiveFocus()
             }
         }
 
@@ -1643,11 +1693,6 @@ Common.BrowserView {
         target: internal.currentDownloadsDialog
 
         onShowDownloadsPage: showDownloadsPage()
-
-        onPreview: {
-                    PopupUtils.close(internal.currentDownloadsDialog);
-                    currentWebview.url = url;
-        }
     }
 
     // Work around https://launchpad.net/bugs/1502675 by delaying the switch to
@@ -1873,6 +1918,20 @@ Common.BrowserView {
         onActivated: currentWebview.zoomController.resetSaveFit()
     }
 
+    // Ctrl+W: Open and search tabs list
+    Shortcut {
+        sequence: "Ctrl+Space"
+        enabled: currentWebview || recentView.visible
+        onActivated: {
+            console.log();
+            if (recentView.visible) {
+                recentView.reset()
+            } else {
+                browser.openRecentView()
+            }
+        }
+    }
+
     Loader {
         id: contentHandlerLoader
         source: "../ContentHandler.qml"
@@ -1888,6 +1947,21 @@ Common.BrowserView {
             downloadsViewLoader.item.activeTransfer = transfer
             downloadsViewLoader.item.multiSelect = multiSelect
             downloadsViewLoader.item.pickingMode = true
+        }
+    }
+
+    Loader {
+        id: contentExportLoader
+        source: "../ContentExportDialog.qml"
+        asynchronous: true
+    }
+
+    Connections {
+        target: contentExportLoader.item
+
+        onPreview: {
+            downloadsViewLoader.active = false
+            currentWebview.url = url;
         }
     }
 
