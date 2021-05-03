@@ -1346,7 +1346,7 @@ Common.BrowserView {
                 tab.load()
             }
             if (!url.toString()) {
-                maybeFocusAddressBar()
+                focusAddressBar()
             }
         }
 
@@ -1468,7 +1468,7 @@ Common.BrowserView {
                     recentView.focus = true
                 } else if (tab) {
                     if (tab.empty) {
-                        maybeFocusAddressBar()
+                        focusAddressBar()
                     } else {
                         tabContainer.forceActiveFocus()
                         tab.load();
@@ -1487,18 +1487,10 @@ Common.BrowserView {
             var currentTab = tabsModel.currentTab;
             if (currentTab) {
                 if (currentTab.empty) {
-                    internal.maybeFocusAddressBar()
+                    internal.focusAddressBar()
                 } else {
                     contentsContainer.focus = true;
                 }
-            }
-        }
-
-        function maybeFocusAddressBar() {
-            if (keyboardModel.count > 0) {
-                focusAddressBar()
-            } else {
-                contentsContainer.forceActiveFocus()
             }
         }
 
