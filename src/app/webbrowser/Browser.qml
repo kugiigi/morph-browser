@@ -606,7 +606,7 @@ Common.BrowserView {
         }
         
         onStateChanged: {
-            if (state === "shown") {
+            if (state === "shown" && !browser.wide) {
                 chrome.state = "hidden";
             }
         }
