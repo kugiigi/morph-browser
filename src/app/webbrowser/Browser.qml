@@ -581,7 +581,7 @@ Common.BrowserView {
 
         z: browser.wide ? 1 : 0
         anchors.fill: parent
-        visible: bottomEdgeHandle.dragging || tabslist.animating || (state == "shown")
+        visible: ((browser.currentWebview && !browser.currentWebview.isFullScreen) && bottomEdgeHandle.dragging) || tabslist.animating || (state == "shown")
         onVisibleChanged: {
             if (visible) {
                 forceActiveFocus()
@@ -1084,17 +1084,19 @@ Common.BrowserView {
         }
         height: units.gu(2)
 
-        enabled: !browser.wide && (recentView.state == "") &&
+        enabled: (!browser.wide || (browser.currentWebview && browser.currentWebview.isFullScreen)) 
+                 && (recentView.state == "") &&
                  browser.currentWebview &&
                  (Screen.orientation == Screen.primaryOrientation)
 
         onDraggingChanged: {
-            if (dragging) {
-                if (browser.thisWindow) {
-                    browser.thisWindow.setFullscreen(false)
-                }
-            } else {
-                if (stage == 1) {
+            if (!dragging) {
+                if (browser.currentWebview && browser.currentWebview.isFullScreen) {
+                    if (browser.thisWindow) {
+                        browser.thisWindow.setFullscreen(false)
+                        browser.currentWebview.fullScreenCancelled()
+                    } 
+                } else if (stage == 1) {
                     if (tabsModel.count > 1) {
                         tabslist.selectAndAnimateTab(1)
                     } else {
@@ -1384,6 +1386,7 @@ Common.BrowserView {
         }
 
         readonly property bool hasMouse: (miceModel.count + touchPadModel.count) > 0
+        readonly property bool hasKeyboard: keyboardModel.count > 0
         readonly property bool hasTouchScreen: touchScreenModel.count > 0
 
         // Ref: https://code.google.com/p/chromium/codesearch#chromium/src/components/ui/zoom/page_zoom_constants.cc
@@ -1916,6 +1919,18 @@ Common.BrowserView {
         sequence: "Ctrl+0"
         enabled: currentWebview
         onActivated: currentWebview.zoomController.resetSaveFit()
+    }
+
+    // Escape: Exit webview fullscreen
+    Shortcut {
+        sequence: "Esc"
+        enabled: currentWebview && currentWebview.isFullScreen
+        onActivated: {
+            if (currentWebview.isFullScreen) {
+                thisWindow.setFullscreen(false)
+                currentWebview.fullScreenCancelled()
+            }
+        }
     }
 
     // Ctrl+W: Open and search tabs list
