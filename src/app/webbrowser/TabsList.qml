@@ -104,7 +104,7 @@ Item {
 
         readonly property real dragThreshold: units.gu(15)
 
-        active: tabslist.view && !browser.wide
+        active: tabslist.view
         asynchronous: true
         sourceComponent: Connections{
             target: tabslist.view
@@ -120,80 +120,97 @@ Item {
         }
     }  
 
-    Rectangle {
-        id: searchRec
+    Item {
+        id: content
 
+        height: parent.height
         anchors {
-            top: parent.top
             left: parent.left
             right: parent.right
         }
 
-        height: units.gu(6)
-        color: browser.wide ? "transparent" : theme.palette.normal.background
-        opacity: tabslist.searchMode ? 1 : tabslist.view.verticalOvershoot < 0 ? -tabslist.view.verticalOvershoot / dragLoader.dragThreshold : 0
-        Behavior on opacity {
-            UbuntuNumberAnimation {
-                duration: UbuntuAnimation.FastDuration
-            }
+        UbuntuNumberAnimation on y {
+            running: visible && browser.wide
+            from: parent.height + units.gu(20)
+            to: 0
+            duration: UbuntuAnimation.BriskDuration
         }
 
-        TextField {
-            id: searchField
+        Rectangle {
+            id: searchRec
 
             anchors {
-                verticalCenter: parent.verticalCenter
+                top: parent.top
                 left: parent.left
                 right: parent.right
-                margins: units.gu(1)
-            }
-            placeholderText: i18n.tr("Search Tabs")
-            inputMethodHints: Qt.ImhNoPredictiveText
-            primaryItem: Icon {
-                height: parent.height * 0.5
-                width: height
-                name: "search"
             }
 
-            KeyNavigation.down: tabslist.view
-            onTextChanged: searchDelay.restart()
-            onAccepted: tabslist.selectFirstItem()
+            height: units.gu(6)
+            color: browser.wide ? "transparent" : theme.palette.normal.background
+            opacity: tabslist.searchMode ? 1 : tabslist.view.verticalOvershoot < 0 ? -tabslist.view.verticalOvershoot / dragLoader.dragThreshold : 0
+            Behavior on opacity {
+                UbuntuNumberAnimation {
+                    duration: UbuntuAnimation.FastDuration
+                }
+            }
 
-            Timer {
-                id: searchDelay
-                interval: 300
-                onTriggered: filteredModel.update(searchField.text)
+            TextField {
+                id: searchField
+
+                anchors {
+                    verticalCenter: parent.verticalCenter
+                    left: parent.left
+                    right: parent.right
+                    margins: units.gu(1)
+                }
+                placeholderText: i18n.tr("Search Tabs")
+                inputMethodHints: Qt.ImhNoPredictiveText
+                primaryItem: Icon {
+                    height: parent.height * 0.5
+                    width: height
+                    name: "search"
+                }
+
+                KeyNavigation.down: tabslist.view
+                onTextChanged: searchDelay.restart()
+                onAccepted: tabslist.selectFirstItem()
+
+                Timer {
+                    id: searchDelay
+                    interval: 300
+                    onTriggered: filteredModel.update(searchField.text)
+                }
             }
         }
-    }
 
-   Label {
-        id: resultsLabel
+       Label {
+            id: resultsLabel
 
-        text: searchDelay.running ? i18n.tr("Loading...") : i18n.tr("No results")
-        textSize: Label.Large
-        font.weight: Font.DemiBold
-        color: browser.wide ? UbuntuColors.porcelain : theme.palette.normal.baseText
-        anchors {
-            top: searchRec.bottom
-            horizontalCenter: parent.horizontalCenter
-            margins: units.gu(3)
+            text: searchDelay.running ? i18n.tr("Loading...") : i18n.tr("No results")
+            textSize: Label.Large
+            font.weight: Font.DemiBold
+            color: browser.wide ? UbuntuColors.porcelain : theme.palette.normal.baseText
+            anchors {
+                top: searchRec.bottom
+                horizontalCenter: parent.horizontalCenter
+                margins: units.gu(3)
+            }
+            visible: filteredModel.count == 0
         }
-        visible: filteredModel.count == 0
-    }
 
-    Loader {
-        id: list
+        Loader {
+            id: list
 
-        asynchronous: true
-        anchors.fill: parent
-        anchors.topMargin: tabslist.searchMode ? searchRec.height : 0
-        sourceComponent: browser.wide ? listWideComponent : listNarrowComponent
+            asynchronous: true
+            anchors.fill: parent
+            anchors.topMargin: tabslist.searchMode ? searchRec.height : 0
+            sourceComponent: browser.wide ? listWideComponent : listNarrowComponent
 
-        Behavior on anchors.topMargin {
-            enabled: !browser.wide
-            UbuntuNumberAnimation {
-                duration: UbuntuAnimation.SnapDuration
+            Behavior on anchors.topMargin {
+                enabled: !browser.wide
+                UbuntuNumberAnimation {
+                    duration: UbuntuAnimation.SnapDuration
+                }
             }
         }
     }
@@ -339,10 +356,10 @@ Item {
             id: gridView
 
             property int columnCount: switch (true) {
-                case tabslist.width >= units.gu(100):
+                case content.width >= units.gu(100):
                     3
                     break;
-                case tabslist.width >= units.gu(60):
+                case content.width >= units.gu(60):
                     2
                     break;
                 default:
@@ -352,7 +369,7 @@ Item {
 
             clip: true
             model: filteredModel.parts.grid
-            cellWidth: (tabslist.width) / columnCount
+            cellWidth: (content.width) / columnCount
             cellHeight: ((cellWidth * (browser.height - tabslist.chromeHeight)) / browser.width) + tabslist.tabChromeHeight
             highlight: Component {
                 Item {
@@ -371,6 +388,10 @@ Item {
 
             Keys.onEnterPressed: tabslist.tabSelected(currentItem.tabIndex)
             Keys.onReturnPressed: tabslist.tabSelected(currentItem.tabIndex)
+
+            add: Transition {
+                UbuntuNumberAnimation { properties: "y"; duration: UbuntuAnimation.SnapDuration }
+            }
         }
     }
 
