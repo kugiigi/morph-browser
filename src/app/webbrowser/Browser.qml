@@ -1061,7 +1061,7 @@ Common.BrowserView {
         }
         height: units.gu(2)
 
-        enabled: !browser.wide && (recentView.state == "") &&
+        enabled: (recentView.state == "") &&
                  browser.currentWebview &&
                  (Screen.orientation == Screen.primaryOrientation)
 
@@ -1072,18 +1072,24 @@ Common.BrowserView {
                 }
             } else {
                 if (stage == 1) {
-                    if (tabsModel.count > 1) {
+                    if (tabsModel.count > 1 && !browser.wide) {
                         tabslist.selectAndAnimateTab(1)
                     } else {
                         recentView.state = "shown"
-                        recentToolbar.state = "shown"
+                        if (!browser.wide) {
+                            recentToolbar.state = "shown"
+                        }
                     }
                 } else if (stage == 2) {
                     recentView.state = "shown"
-                    recentToolbar.state = "shown"
+                    if (!browser.wide) {
+                        recentToolbar.state = "shown"
+                    }
                 } else if (stage >= 3) {
                     recentView.state = "shown"
-                    recentToolbar.state = "shown"
+                    if (!browser.wide) {
+                        recentToolbar.state = "shown"
+                    }
                 }
             }
         }
@@ -1105,7 +1111,7 @@ Common.BrowserView {
                 UbuntuNumberAnimation {}
             }
         }
-        visible: bottomEdgeHandle.enabled && !internal.hasMouse
+        visible: bottomEdgeHandle.enabled && !internal.hasMouse && !browser.wide
         opacity: recentView.visible ? 0 : 1
         Behavior on opacity {
             UbuntuNumberAnimation {}
