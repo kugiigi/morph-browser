@@ -563,7 +563,8 @@ Common.BrowserView {
 
         z: browser.wide ? 1 : 0
         anchors.fill: parent
-        visible: bottomEdgeHandle.dragging || tabslist.animating || (state == "shown")
+        opacity: bottomEdgeHandle.dragging || tabslist.animating || (state == "shown") ? 1 : 0
+        visible: opacity > 0
         onVisibleChanged: {
             if (visible) {
                 forceActiveFocus()
@@ -613,6 +614,13 @@ Common.BrowserView {
             }
 
             event.accepted = true;
+        }
+
+        Behavior on opacity {
+            enabled: recentView.state !== "shown" && browser.wide
+            UbuntuNumberAnimation {
+                duration: UbuntuAnimation.BriskDuration
+            }
         }
 
         Rectangle {
